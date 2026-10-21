@@ -1,0 +1,87 @@
+/*
+ * Dark Sheets
+ * Google Sheets のセル領域は <canvas> 描画のため、CSS filter で色を反転する方式を採用。
+ *   invert(1)          : 明暗を反転
+ *   hue-rotate(180deg) : 反転でずれた色相を元に戻す (赤は赤系、青は青系のまま)
+ * 画像・動画・カラーピッカーなど「本来の色」が重要な要素は同じフィルタを再度かけて元に戻す。
+ *
+ * カラーテーマ:
+ *   SVG フィルタ (url()) はツールバー等が描画されなくなるため使わない。
+ *   代わりに body の外 (html の疑似要素) に全面オーバーレイを置き、
+ *     lighten (背景色) → 反転後の黒を bg まで持ち上げる
+ *     darken  (文字色) → 反転後の白を fg まで下げる
+ *   で各チャンネルを [bg, fg] に収める。
+ */
+
+:root {
+  --dgs-brightness: 1;
+  --dgs-contrast: 0.9;
+  --dgs-bg: #000;
+  --dgs-fg: #fff;
+}
+
+/* ---------- 反転 ---------- */
+
+html[data-dgs-active="1"] {
+  background-color: #000 !important;
+}
+
+html[data-dgs-active="1"] > body {
+  /* 背景が透明だと反転されないため白を明示 (反転後は暗色になる) */
+  background-color: #fff !important;
+  filter: invert(1) hue-rotate(180deg) brightness(var(--dgs-brightness))
+    contrast(var(--dgs-contrast)) !important;
+}
+
+/* 本来の色を保つ要素は再反転 */
+html[data-dgs-active="1"] > body :is(
+    img,
+    video,
+    picture,
+    embed,
+    object,
+    /* カラーピッカーの色見本 */
+    .docs-material-colorpalette-colorswatch-color,
+    .docs-material-hsv-color-picker-saturation-value,
+    .docs-material-hsv-color-picker-hue,
+    .goog-palette-colorswatch,
+    /* シート上に配置されたグラフ・図形・画像 */
+    .waffle-embedded-object-overlay,
+    .waffle-borderless-embedded-object-overlay
+  ) {
+  filter: invert(1) hue-rotate(180deg) !important;
+}
+
+/* 再反転済み要素の中の画像は二重反転しないよう解除 */
+html[data-dgs-active="1"] > body :is(
+    .waffle-embedded-object-overlay,
+    .waffle-borderless-embedded-object-overlay,
+    picture
+  ) :is(img, video, picture) {
+  filter: none !important;
+}
+
+/* ---------- カラーテーマ (オーバーレイ) ---------- */
+
+html[data-dgs-active="1"]:not([data-dgs-theme="default"]) {
+  background-color: var(--dgs-bg) !important;
+}
+
+html[data-dgs-active="1"]:not([data-dgs-theme="default"])::before,
+html[data-dgs-active="1"]:not([data-dgs-theme="default"])::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+}
+
+html[data-dgs-active="1"]:not([data-dgs-theme="default"])::before {
+  background: var(--dgs-bg);
+  mix-blend-mode: lighten;
+}
+
+html[data-dgs-active="1"]:not([data-dgs-theme="default"])::after {
+  background: var(--dgs-fg);
+  mix-blend-mode: darken;
+}
